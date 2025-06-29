@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Envanter Yönetimi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            width: 95%;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+
+        .search-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            width: 50%;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .delete-btn {
+            background-color: #dc3545;
+        }
+
+        .delete-btn:hover {
+            background-color: #b52b3b;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #007BFF;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .pagination {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .pagination a {
+            text-decoration: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            color: white;
+            background-color: #007BFF;
+        }
+
+        .pagination a:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+
+<div class="container">
+    <h1>Envanter Yönetimi</h1>
+
+    <!-- Arama Kutusu -->
+    <div class="search-container">
+        <form action="/" method="get">
+            <input type="text" name="search" placeholder="Ürün No, Başlık veya Detay ile Ara..." value="{{ search_query }}">
+            <button type="submit">Ara</button>
+        </form>
+    </div>
+
+    <div class="button-container">
+        <a href="/add-new-item"><button>Yeni Ürün Ekle</button></a>
+        <a href="/export-excel"><button style="background-color: #28a745;">📊 Excel'e Aktar</button></a>
+        {% if request.args.get('group') == '1' %}
+            <a href="/?group=0{{ '&search=' + search_query if search_query }}"><button style="background-color: #28a745;">📋 Normal Görünüm</button></a>
+        {% else %}
+            <a href="/?group=1{{ '&search=' + search_query if search_query }}"><button style="background-color: #ffc107; color: black;">📦 Grupla</button></a>
+        {% endif %}
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <p style="color: {{ 'red' if category == 'error' else 'green' }}">{{ message }}</p>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <table>
+        <thead>
+            <tr>
+                <th>Resim</th>
+                <th>Ürün No</th>
+                <th>Başlık</th>
+                <th>Detaylar{% if request.args.get('group') == '1' %} / Varyantlar{% endif %}</th>
+                <th>Stok</th>
+                <th>Para Birimi</th>
+                <th>Başlangıç Fiyatı</th>
+                <th>Depo Bilgisi</th>
+                <th>İşlemler</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inventory %}
+            <tr>
+                <td style="text-align: center; width: 00px;">
+                    {% if item.image_path %}
+                    <a href="{{ url_for('get_image', id=item.id|int) }}" target="_blank">
+                        <img src="{{ url_for('get_image', id=item.id|int) }}" alt="Ürün Resmi" style="width: 150px; height: auto; cursor: pointer;" 
+                             onclick="showLargeImage('{{ url_for('get_image', id=item.id|int) }}', '{{ item.title }}'); return false;">
+                    </a>
+                    {% else %}
+                    <span style="color: #ccc;">➖</span>
+                    {% endif %}
+                </td>
+                <td>{{ item["item_number"] }}</td>
+                <td>{{ item["title"] }}{% if item.variant_count and item.variant_count > 1 %} <span style="color: #007BFF; font-weight: bold;">({{ item.variant_count }} varyant)</span>{% endif %}</td>
+                <td>{{ item["variation_details"] }}</td>
+                <td>{{ item["available_quantity"] }}</td>
+                <td>$</td>
+                <td>{{ item["start_price"] }}</td>
+                <td>{{ item["depot_info"] }}</td>
+                <td>
+                    {% if item["id"] is defined and item["id"] is not none %}
+                    <a href="{{ url_for('edit_item', id=item['id']|int) }}">
+                        <button>Düzenle</button>
+                    </a>
+                    <form action="{{ url_for('delete_item', id=item['id']|int) }}" method="POST" style="display:inline;" onsubmit="return confirmAndPassword();">
+                        <button type="submit" class="delete-btn">Sil</button>
+                    </form>
+
+                    <a href="{{ url_for('upload_image', id=item['id']|int) }}">
+                        <button>📷 Resim</button>
+                    </a>
+                    {% else %}
+                    <span>ID bulunamadı</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+<script>
+    function openPrintDialog(itemId) {
+        let size = prompt("Lütfen etiket boyutunu seçin: (40x15, 40x20, 40x30)", "40x15");
+        if (size) {
+            let url = "/print-label/" + itemId + "?size=" + size;
+            let printWindow = window.open(url, "_blank");
+
+            // Pop-up engelleyici kontrolü
+            if (!printWindow || printWindow.closed || typeof printWindow.closed == 'undefined') {
+                alert("Lütfen pop-up engelleyicisini devre dışı bırakın ve tekrar deneyin.");
+            }
+        }
+    }
+    
+    // Büyük resim görüntüleme modalı
+    function showLargeImage(imageUrl, title) {
+        // Modal oluştur
+        var modal = document.createElement('div');
+        modal.style.position = 'fixed';
+        modal.style.left = '0';
+        modal.style.top = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.backgroundColor = 'rgba(0,0,0,0.8)';
+        modal.style.zIndex = '1000';
+        modal.style.display = 'flex';
+        modal.style.flexDirection = 'column';
+        modal.style.justifyContent = 'center';
+        modal.style.alignItems = 'center';
+        
+        // Başlık
+        var titleDiv = document.createElement('div');
+        titleDiv.style.color = 'white';
+        titleDiv.style.padding = '10px';
+        titleDiv.style.fontSize = '18px';
+        titleDiv.textContent = title || 'Ürün Resmi';
+        
+        // Resim
+        var img = document.createElement('img');
+        img.src = imageUrl;
+        img.style.maxWidth = '90%';
+        img.style.maxHeight = '90%';
+        img.style.border = '2px solid white';
+        img.style.borderRadius = '5px';
+        img.style.boxShadow = '0 0 20px rgba(255,255,255,0.3)';
+        
+        // Kapatma butonu
+        var closeButton = document.createElement('button');
+        closeButton.textContent = 'Kapat';
+        closeButton.style.marginTop = '20px';
+        closeButton.style.padding = '10px 20px';
+        closeButton.style.borderRadius = '5px';
+        closeButton.style.backgroundColor = '#007BFF';
+        closeButton.style.color = 'white';
+        closeButton.style.border = 'none';
+        closeButton.style.cursor = 'pointer';
+        
+        closeButton.onclick = function() {
+            document.body.removeChild(modal);
+        };
+        
+        // Arka plana tıklayınca da kapansın
+        modal.onclick = function(e) {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+            }
+        };
+        
+        // Elementleri ekle
+        modal.appendChild(titleDiv);
+        modal.appendChild(img);
+        modal.appendChild(closeButton);
+        
+        // Modal'ı sayfaya ekle
+        document.body.appendChild(modal);
+    }
+
+    function confirmAndPassword() {
+        if (!confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
+            return false;
+        }
+        var password = prompt('Lütfen silme işlemi için şifreyi girin:');
+        if (password === null) {
+            // Kullanıcı iptal etti
+            return false;
+        }
+        if (password !== 'admin123') {
+            alert('Hatalı şifre!');
+            return false;
+        }
+        return true;
+    }
+</script>
+
+
+
+    <!-- Sayfalama -->
+    <div class="pagination">
+        {% if page > 1 %}
+            <a href="{{ url_for('index', page=page-1, search=search_query, group=request.args.get('group')) }}">Önceki</a>
+        {% endif %}
+
+        {% for p in range(1, total_pages + 1) %}
+            <a href="{{ url_for('index', page=p, search=search_query, group=request.args.get('group')) }}">{{ p }}</a>
+        {% endfor %}
+
+        {% if page < total_pages %}
+            <a href="{{ url_for('index', page=page+1, search=search_query, group=request.args.get('group')) }}">Sonraki</a>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etiket Yazdır</title>
+    <style>
+        body {
+            text-align: center;
+        }
+
+        .label-container {
+            width: {{ "40mm" if size == "40x15" else "40mm" if size == "40x20" else "40mm" }};
+            height: {{ "15mm" if size == "40x15" else "20mm" if size == "40x20" else "30mm" }};
+            border: 1px solid black;
+            padding: 5px;
+            font-size: 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: auto;
+        }
+
+        .print-button {
+            margin-top: 10px;
+        }
+
+        @media print {
+            .print-button {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h2>Etiket Önizleme</h2>
+
+<div class="label-container">
+    <strong>{{ item['title'] }}</strong><br>
+    Ürün No: {{ item['item_number'] }}<br>
+    Fiyat: {{ item['start_price'] }} {{ item['currency'] }}<br>
+    Stok: {{ item['available_quantity'] }} Adet
+</div>
+
+
+
+</body>
+</html>

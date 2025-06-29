@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ürün Yönetimi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
+        .container {
+            width: 50%;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        form {
+            text-align: left;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 10px;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-top: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .cancel-btn {
+            background-color: #dc3545;
+        }
+
+        .cancel-btn:hover {
+            background-color: #b52b3b;
+        }
+        
+        .image-preview {
+            margin-top: 10px;
+            display: none;
+            max-width: 300px;
+            max-height: 300px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .image-preview img {
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Ürün Ekle</h1>
+    <form method="post" enctype="multipart/form-data">
+        <label>Ürün No (Boş bırakılırsa otomatik oluşturulur):</label>
+        <input type="text" name="item_number">
+
+        <label>Başlık:</label>
+        <input type="text" name="title" required>
+
+        <label>Detaylar:</label>
+        <textarea name="variation_details"></textarea>
+
+        <label>Stok Miktarı:</label>
+        <input type="number" name="available_quantity" min="0" required>
+
+        <label>Para Birimi:</label>
+        <input type="text" name="currency" value="$" required>
+
+        <label>Başlangıç Fiyatı:</label>
+        <input type="number" name="start_price" step="0.01" min="0" required>
+
+        <label>Depo Bilgisi:</label>
+        <textarea name="depot_info"></textarea>
+        
+        <label>Ürün Görseli:</label>
+        <input type="file" name="file" id="product-image" accept=".png, .jpg, .jpeg, .gif">
+        <div class="image-preview" id="image-preview">
+            <img id="preview-img" src="#" alt="Önizleme">
+        </div>
+
+        <button type="submit">Kaydet</button>
+        <a href="/"><button type="button" class="cancel-btn">İptal</button></a>
+    </form>
+</div>
+
+<script>
+// Görsel önizleme
+document.getElementById('product-image').addEventListener('change', function(e) {
+    const preview = document.getElementById('image-preview');
+    const previewImg = document.getElementById('preview-img');
+    const file = this.files[0];
+    
+    if(file) {
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            preview.style.display = 'block';
+        }
+        
+        reader.readAsDataURL(file);
+    } else {
+        preview.style.display = 'none';
+    }
+});
+</script>
+
+</body>
+</html>

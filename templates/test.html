@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Sayfası</title>
+</head>
+<body>
+    <h1>Test Sayfası</h1>
+    
+    <p>ID Değeri: {{ test_item.id }}</p>
+    <p>ID Tipi: {{ test_item.id.__class__.__name__ }}</p>
+    
+    <!-- URL oluşturma test -->
+    <p>Test URL link: 
+        <a href="{{ url_for('edit_item', id=test_item.id) }}">Edit Link</a>
+    </p>
+    
+    <!-- Ham URL değeri -->
+    <p>Raw URL Value: {{ url_for('edit_item', id=test_item.id) }}</p>
+    
+    <!-- URL oluşturma alternatif -->
+    <p>Alternative URL: {{ url_for('edit_item', id=123) }}</p>
+    
+    <!-- Tüm veri -->
+    <pre>{{ test_item }}</pre>
+    
+</body>
+</html> 

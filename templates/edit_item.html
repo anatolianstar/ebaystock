@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ürün Düzenle</title>
+    <style>
+        /* Sayfa genel stil ayarları */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px 0;
+        }
+
+        .container {
+            width: 80%;
+            max-width: 800px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        form {
+            text-align: left;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 10px;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-top: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .cancel-btn {
+            background-color: #dc3545;
+        }
+
+        .cancel-btn:hover {
+            background-color: #b52b3b;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+
+        .button-group button {
+            width: 100%;
+            margin: 0 5px;
+        }
+        
+        .image-preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .image-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+    </style>
+
+    <script>
+        function validateForm() {
+            let quantity = document.forms["editForm"]["available_quantity"].value;
+            let price = document.forms["editForm"]["start_price"].value;
+            if (quantity < 0 || price < 0) {
+                alert("Stok miktarı ve fiyat negatif olamaz!");
+                return false;
+            }
+            return true;
+        }
+        
+        function openPrintDialog(itemId) {
+            let size = prompt("Lütfen etiket boyutunu seçin: (40x15, 40x20, 40x30)", "40x15");
+            if (size) {
+                let url = "/print-label/" + itemId + "?size=" + size;
+                let printWindow = window.open(url, "_blank");
+
+                // Pop-up engelleyiciye karşı kontrol
+                if (!printWindow || printWindow.closed || typeof printWindow.closed == 'undefined') {
+                    alert("Lütfen pop-up engelleyicisini devre dışı bırakın ve tekrar deneyin.");
+                }
+            }
+        }
+    </script>
+</head>
+<body>
+<div class="container">
+    <h1>Ürün Düzenle</h1>
+    
+    <!-- Ürün Resmi Önizleme -->
+    <div class="image-preview">
+        <h3>Ürün Resmi</h3>
+        <img src="{{ url_for('get_image', id=item.id) }}" alt="Ürün Resmi">
+        <a href="{{ url_for('upload_image', id=item.id) }}">
+            <button type="button">Resim Değiştir</button>
+        </a>
+    </div>
+    
+    <form name="editForm" method="post" action="{{ url_for('edit_item', id=item.id) }}" onsubmit="return validateForm()">
+        <label>Ürün No:</label>
+        <input type="text" name="item_number" value="{{ item['item_number'] }}" required>
+
+        <label>Başlık:</label>
+        <input type="text" name="title" value="{{ item['title'] }}" required>
+
+        <label>Detaylar:</label>
+        <textarea name="variation_details">{{ item['variation_details'] }}</textarea>
+
+        <label>Stok Miktarı:</label>
+        <input type="number" name="available_quantity" value="{{ item['available_quantity'] }}" min="0" required>
+
+        <label>Para Birimi:</label>
+        <input type="text" name="currency" value="$" readonly>
+
+        <label>Başlangıç Fiyatı:</label>
+        <input type="number" name="start_price" value="{{ item['start_price'] }}" step="0.01" min="0" required>
+
+        <label>Depo Bilgisi:</label>
+        <textarea name="depot_info">{{ item['depot_info'] }}</textarea>
+
+        <div class="button-group">
+            <button type="submit">Kaydet</button>
+            <button type="button" onclick="openPrintDialog('{{ item.id }}')">🖨 Yazdır</button>
+            <a href="{{ url_for('index') }}">
+                <button type="button" class="cancel-btn">İptal</button>
+            </a>
+        </div>
+    </form>
+</div>
+</body>
+</html>
