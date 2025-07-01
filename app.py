@@ -86,7 +86,7 @@ app.secret_key = "your_secret_key"
 # Database.db dosyası exe ile aynı klasörde olacak
 DATABASE_NAME = "database.db"
 
-# PyInstaller ile exe yapıldığında database exe'nin yanında olsun
+# PyInstaller ile exe yapıldığında database ve upload folder exe'nin yanında olsun
 if getattr(sys, 'frozen', False):
     # PyInstaller ile çalışırken - exe'nin bulunduğu dizin
     app_dir = os.path.dirname(sys.executable)
@@ -507,7 +507,8 @@ def add_new_item():
             if file and file.filename != '' and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 file_extension = filename.rsplit('.', 1)[1].lower()
-                safe_filename = f"product_{item_number}_{new_item_id}.{file_extension}"
+                timestamp = str(int(datetime.now().timestamp()))
+                safe_filename = f"product_{item_number}_{new_item_id}_{timestamp}.{file_extension}"
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
 
                 # Dosyayı kaydet
@@ -625,11 +626,11 @@ def upload_image(id):
                 except:
                     pass
 
-            # Güvenli dosya adı oluştur
+            # Güvenli dosya adı oluştur - Standart format
             filename = secure_filename(file.filename)
-            # Dosya adına ürün numarasını ve benzersiz bir kimlik ekle
             file_extension = filename.rsplit('.', 1)[1].lower()
-            safe_filename = f"product_{item['item_number']}_{id}.{file_extension}"
+            timestamp = str(int(datetime.now().timestamp()))
+            safe_filename = f"product_{item['item_number']}_{id}_{timestamp}.{file_extension}"
 
             # Dosya yolunu oluştur
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], safe_filename)
@@ -661,13 +662,52 @@ def get_image(id):
     conn.close()
 
     if not item or not item['image_path'] or not os.path.exists(item['image_path']):
-        # Varsayılan resim dosyasını döndür
-        return send_from_directory('static', 'default-product.png')
+        # Varsayılan resim döndür - exe uyumlu
+        try:
+            # Önce static klasöründe ara
+            default_path = os.path.join('static', 'default-product.png')
+            if os.path.exists(default_path):
+                return send_from_directory('static', 'default-product.png')
+            # Exe durumunda farklı path dene
+            elif getattr(sys, 'frozen', False):
+                static_path = os.path.join(os.path.dirname(sys.executable), 'static')
+                if os.path.exists(os.path.join(static_path, 'default-product.png')):
+                    return send_from_directory(static_path, 'default-product.png')
+        except:
+            pass
+        # Varsayılan 1x1 pixel PNG döndür
+        from flask import Response
+        import base64
+        # 1x1 şeffaf PNG data
+        tiny_png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
+        return Response(tiny_png, mimetype='image/png')
 
-    # Resim dosyasını gönder
-    directory = os.path.dirname(item['image_path'])
-    filename = os.path.basename(item['image_path'])
-    return send_from_directory(directory, filename)
+    # Resim dosyasını gönder - exe uyumlu
+    try:
+        # Exe durumunda UPLOAD_FOLDER ile relative path oluştur  
+        if getattr(sys, 'frozen', False):
+            # Exe'de çalışırken - upload klasörü exe'nin yanında
+            exe_dir = os.path.dirname(sys.executable)
+            upload_dir = os.path.join(exe_dir, 'static', 'uploads')
+            filename = os.path.basename(item['image_path'])
+            full_path = os.path.join(upload_dir, filename)
+            
+            if os.path.exists(full_path):
+                return send_from_directory(upload_dir, filename)
+        else:
+            # Normal durumda orijinal path kullan
+            directory = os.path.dirname(item['image_path'])
+            filename = os.path.basename(item['image_path'])
+            if os.path.exists(item['image_path']):
+                return send_from_directory(directory, filename)
+    except Exception as e:
+        print(f"Resim gönderme hatası: {e}")
+    
+    # Hata durumunda varsayılan resim döndür
+    from flask import Response
+    import base64
+    tiny_png = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==')
+    return Response(tiny_png, mimetype='image/png')
 
 
 # Özel test sayfası
@@ -701,6 +741,12 @@ def test_page():
         import traceback
         traceback.print_exc()
         return f"Test sayfasında hata: {str(e)}", 500
+
+
+@app.route("/ip-monitor", methods=["GET"])
+def ip_monitor_dashboard():
+    """IP Monitor Dashboard for real-time IP tracking and dynamic IP management"""
+    return render_template("ip_dashboard.html")
 
 
 # Excel'e aktarma fonksiyonu
@@ -789,13 +835,13 @@ if __name__ == "__main__":
         input("Çıkmak için Enter tuşuna basın...")
         sys.exit(1)
     
-    print("🌐 Web arayüzü: http://localhost:5003")
-    print("📱 Mobil erişim: http://0.0.0.0:5003")
+    print("🌐 Web arayüzü: http://localhost:5000")
+    print("📱 Mobil erişim: http://0.0.0.0:5000")
     print("⚡ Kapatmak için Ctrl+C")
     print("-" * 40)
     
     try:
-        app.run(host='0.0.0.0', port=5003, debug=False)
+        app.run(host='0.0.0.0', port=5000, debug=False)
     except KeyboardInterrupt:
         print("\n🛑 Sunucu kullanıcı tarafından durduruldu")
     except Exception as e:

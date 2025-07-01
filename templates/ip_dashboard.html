@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Monitor Dashboard - EbayStock</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .ip-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background: #5a67d8;
+        }
+
+        .status-active {
+            color: green;
+            font-weight: bold;
+        }
+
+        .status-inactive {
+            color: red;
+            font-weight: bold;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .history-table th,
+        .history-table td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .history-table th {
+            background: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌐 IP Monitor Dashboard</h1>
+            <p>Real-time IP address monitoring</p>
+        </div>
+
+        <div class="card">
+            <h3>Current IP Status</h3>
+            <div id="current-ip" class="ip-display">Loading...</div>
+            <p><strong>Last Update:</strong> <span id="last-update">-</span></p>
+            <p><strong>Monitor Status:</strong> <span id="monitor-status">-</span></p>
+            <button class="btn" onclick="refreshStatus()">🔄 Refresh</button>
+        </div>
+
+        <div class="card">
+            <h3>IP Address History</h3>
+            <div id="history-container">Loading history...</div>
+        </div>
+
+        <div class="card">
+            <h3>Quick Actions</h3>
+            <button class="btn" onclick="downloadConfig()">📥 Download Config</button>
+            <button class="btn" onclick="showInstructions()">📖 Instructions</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshStatus();
+            setInterval(refreshStatus, 30000); // Refresh every 30 seconds
+        });
+
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/ip-status');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('current-ip').textContent = data.current_ip || 'No IP detected';
+                    document.getElementById('last-update').textContent = data.last_update ? new Date(data.last_update).toLocaleString() : 'Never';
+                    document.getElementById('monitor-status').textContent = data.monitor_running ? 'Running' : 'Not Running';
+                    document.getElementById('monitor-status').className = data.monitor_running ? 'status-active' : 'status-inactive';
+                    
+                    updateHistory(data.history || []);
+                }
+            } catch (error) {
+                console.error('Error refreshing status:', error);
+            }
+        }
+
+        function updateHistory(history) {
+            const container = document.getElementById('history-container');
+            
+            if (history.length === 0) {
+                container.innerHTML = '<p>No IP history available</p>';
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.className = 'history-table';
+            table.innerHTML = `
+                <tr>
+                    <th>IP Address</th>
+                    <th>Timestamp</th>
+                    <th>Location</th>
+                </tr>
+                ${history.map(item => `
+                    <tr>
+                        <td>${item.ip}</td>
+                        <td>${new Date(item.timestamp).toLocaleString()}</td>
+                        <td>${item.location || 'Unknown'}</td>
+                    </tr>
+                `).join('')}
+            `;
+            
+            container.innerHTML = '';
+            container.appendChild(table);
+        }
+
+        function downloadConfig() {
+            const config = {
+                "check_interval": 300,
+                "ip_services": [
+                    "https://api.ipify.org?format=json",
+                    "https://httpbin.org/ip"
+                ],
+                "webhook_url": "http://localhost:5001/api/ip-update",
+                "notification_file": "current_ip.txt"
+            };
+            
+            const blob = new Blob([JSON.stringify(config, null, 4)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ip_config.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function showInstructions() {
+            alert(`IP Monitor Setup:
+
+1. Run: python ip_monitor_service.py
+2. Monitor will check IP every 5 minutes
+3. Changes are automatically reported to this system
+4. Check current_ip.txt for latest IP
+5. View logs in ip_monitor.log`);
+        }
+    </script>
+</body>
+</html> 

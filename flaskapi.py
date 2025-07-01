@@ -1,15 +1,29 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3
+import sys
 import os
 import uuid
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
-app = Flask(__name__)
+# Exe için klasör yolu ayarla - Standart yaklaşım
+if getattr(sys, 'frozen', False):
+    # Exe durumunda - exe'nin yanındaki klasör
+    app_dir = os.path.dirname(sys.executable)
+    DATABASE = os.path.join(app_dir, "database.db")
+    UPLOAD_FOLDER = os.path.join(app_dir, 'static', 'uploads')
+    static_folder = os.path.join(app_dir, 'static')
+    print(f"🔧 Running as EXE - Upload folder: {UPLOAD_FOLDER}")
+else:
+    # Normal Python durumunda
+    DATABASE = "database.db"
+    UPLOAD_FOLDER = 'static/uploads'
+    static_folder = 'static'
+    print(f"🔧 Running as Script - Upload folder: {UPLOAD_FOLDER}")
+
+app = Flask(__name__, static_folder=static_folder)
 CORS(app)  # CORS'u açarak Android uygulamasının bağlanmasını sağlıyoruz
-DATABASE = "database.db"
-UPLOAD_FOLDER = "static/uploads"
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
 # Create upload folder if it doesn't exist
@@ -241,30 +255,31 @@ def upload_image(id):
                 conn.close()
                 return jsonify({"error": f"Database error: {str(e)}"}), 500
 
-        # Dosya adı oluştur
+        # Dosya adı oluştur - Standart format
         item_number = item['item_number']
         filename = secure_filename(file.filename)
         file_extension = filename.rsplit('.', 1)[1].lower()
-        unique_id = str(uuid.uuid4())[:8]  # Benzersiz bir ID ekle
-        new_filename = f"product_{item_number}_{id}_{unique_id}.{file_extension}"
+        timestamp = str(int(datetime.now().timestamp()))
+        new_filename = f"product_{item_number}_{id}_{timestamp}.{file_extension}"
 
         # Dosyayı kaydet
         file_path = os.path.join(UPLOAD_FOLDER, new_filename)
         file.save(file_path)
 
-        # Standart göreceli yol
-        standardized_path = f"static/uploads/{new_filename}"
+        # WEB ARAYÜZÜ İLE UYUMLU FORMATTA YOLU SAKLA
+        # Web arayüzü tam dosya yolunu bekliyor
+        full_file_path = os.path.join(UPLOAD_FOLDER, new_filename)
 
-        # Veritabanını güncelle
-        conn.execute("UPDATE inventory SET image_path = ? WHERE id = ?", (standardized_path, id))
+        # Veritabanını güncelle - web arayüzü ile aynı format (tam yol)
+        conn.execute("UPDATE inventory SET image_path = ? WHERE id = ?", (full_file_path, id))
         conn.commit()
         conn.close()
 
-        # Başarı yanıtı
+        # Başarı yanıtı - Android için göreceli yol döndür
         return jsonify({
             "success": True,
             "message": "Image uploaded successfully",
-            "image_url": standardized_path,
+            "image_url": f"static/uploads/{new_filename}",
             "item_id": id
         })
 
@@ -281,21 +296,28 @@ def get_image_url(id):
     if result and result['image_path']:
         image_path = result['image_path']
 
-        # Eğer tam bir dosya yolu veya sadece dosya adı ise standardize et
-        if os.path.isabs(image_path) or '/' not in image_path:
-            # Dosya adını al
+        # Dosya mevcut mu kontrol et
+        if os.path.exists(image_path):
+            # Dosya adını al ve Android için göreceli yol döndür
             filename = os.path.basename(image_path)
-            # Standart göreceli yol kullan
-            standardized_path = f"static/uploads/{filename}"
-        else:
-            # Zaten standardize edilmiş yol ise olduğu gibi döndür
-            standardized_path = image_path
+            android_path = f"static/uploads/{filename}"
 
-        return jsonify({
-            "success": True,
-            "image_url": standardized_path,
-            "item_id": id
-        })
+            return jsonify({
+                "success": True,
+                "image_url": android_path,
+                "item_id": id
+            })
+        else:
+            # Dosya mevcut değilse, eski format kontrol et
+            filename = os.path.basename(image_path)
+            potential_path = os.path.join(UPLOAD_FOLDER, filename)
+
+            if os.path.exists(potential_path):
+                return jsonify({
+                    "success": True,
+                    "image_url": f"static/uploads/{filename}",
+                    "item_id": id
+                })
 
     # Resim yok
     return jsonify({
@@ -321,33 +343,162 @@ def get_all_images():
     images = []
     for result in results:
         if result['image_path']:
-            # Standardize image path for consistent URLs
             image_path = result['image_path']
-            if not image_path.startswith("static/uploads/") and '/' in image_path:
-                # Get filename and standardize
-                filename = os.path.basename(image_path)
-                standardized_path = f"static/uploads/{filename}"
-            else:
-                standardized_path = image_path
 
-            images.append({
-                "id": result['id'],
-                "product_id": result['id'],
-                "image_url": standardized_path,
-                "timestamp": "N/A"  # You could add file creation time here if needed
-            })
+            # Dosya mevcut mu kontrol et
+            if os.path.exists(image_path):
+                filename = os.path.basename(image_path)
+                android_path = f"static/uploads/{filename}"
+
+                images.append({
+                    "id": result['id'],
+                    "product_id": result['id'],
+                    "image_url": android_path,
+                    "timestamp": "N/A"
+                })
+            else:
+                # Eski format kontrol et
+                filename = os.path.basename(image_path)
+                potential_path = os.path.join(UPLOAD_FOLDER, filename)
+
+                if os.path.exists(potential_path):
+                    images.append({
+                        "id": result['id'],
+                        "product_id": result['id'],
+                        "image_url": f"static/uploads/{filename}",
+                        "timestamp": "N/A"
+                    })
 
     return jsonify(images)
 
 
+# 📌 IP Address Update Endpoint for Dynamic IP Monitoring
+@app.route("/api/ip-update", methods=["POST"])
+def ip_update():
+    """Receive IP address change notifications from IP monitor service"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+            
+        new_ip = data.get('new_ip')
+        old_ip = data.get('old_ip')
+        timestamp = data.get('timestamp')
+        
+        if not new_ip:
+            return jsonify({"error": "No new IP address provided"}), 400
+        
+        # Log the IP change
+        print(f"🌐 IP Address Updated: {old_ip} -> {new_ip} at {timestamp}")
+        
+        # Save to IP history database if exists
+        try:
+            if os.path.exists('ip_history.db'):
+                conn = sqlite3.connect('ip_history.db')
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO ip_history (ip_address, timestamp, location, isp, change_reason)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (new_ip, timestamp, 'Auto-detected', 'Unknown', f'API notification from {old_ip}'))
+                conn.commit()
+                conn.close()
+        except Exception as db_error:
+            print(f"⚠️ Database logging failed: {db_error}")
+        
+        # Update current IP file
+        try:
+            with open('current_ip.txt', 'w') as f:
+                f.write(f"{new_ip}\n{timestamp}")
+        except Exception as file_error:
+            print(f"⚠️ File update failed: {file_error}")
+        
+        # Notify connected clients (if any WebSocket connections exist)
+        # This can be extended for real-time notifications
+        
+        return jsonify({
+            "success": True,
+            "message": "IP address updated successfully",
+            "new_ip": new_ip,
+            "old_ip": old_ip,
+            "timestamp": timestamp
+        })
+        
+    except Exception as e:
+        print(f"❌ IP update error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# 📌 Get Current IP Status
+@app.route("/api/ip-status", methods=["GET"])
+def get_ip_status():
+    """Get current IP address and status information"""
+    try:
+        current_ip = None
+        last_update = None
+        
+        # Read current IP from file
+        if os.path.exists('current_ip.txt'):
+            try:
+                with open('current_ip.txt', 'r') as f:
+                    lines = f.read().strip().split('\n')
+                    if len(lines) >= 1:
+                        current_ip = lines[0]
+                    if len(lines) >= 2:
+                        last_update = lines[1]
+            except Exception as e:
+                print(f"⚠️ Failed to read IP file: {e}")
+        
+        # Get IP history if database exists
+        history = []
+        if os.path.exists('ip_history.db'):
+            try:
+                conn = sqlite3.connect('ip_history.db')
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT ip_address, timestamp, location, isp 
+                    FROM ip_history 
+                    ORDER BY timestamp DESC 
+                    LIMIT 5
+                """)
+                results = cursor.fetchall()
+                history = [
+                    {
+                        'ip': row[0],
+                        'timestamp': row[1],
+                        'location': row[2],
+                        'isp': row[3]
+                    }
+                    for row in results
+                ]
+                conn.close()
+            except Exception as e:
+                print(f"⚠️ Failed to read IP history: {e}")
+        
+        return jsonify({
+            "success": True,
+            "current_ip": current_ip,
+            "last_update": last_update,
+            "history": history,
+            "monitor_running": os.path.exists('ip_monitor.log')
+        })
+        
+    except Exception as e:
+        print(f"❌ IP status error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     print("🚀 Flask API Server starting...")
-    print("📡 Server running on: http://localhost:5002")
-    print("🌐 API endpoints available at: http://0.0.0.0:5002")
+    print("📡 Server running on: http://localhost:5001")
+    print("🌐 API endpoints available at: http://0.0.0.0:5001")
+    print("💡 IP Monitor endpoints:")
+    print("   POST /api/ip-update - Receive IP change notifications")
+    print("   GET  /api/ip-status - Get current IP status")
     print("⚡ Press Ctrl+C to stop the server")
     print("-" * 50)
     try:
-        app.run(host="0.0.0.0", port=5002, debug=False)
+        app.run(host="0.0.0.0", port=5001, debug=False)
     except KeyboardInterrupt:
         print("\n🛑 Server stopped by user")
     except Exception as e:

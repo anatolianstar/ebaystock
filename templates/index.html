@@ -119,6 +119,7 @@
     <div class="button-container">
         <a href="/add-new-item"><button>Yeni Ürün Ekle</button></a>
         <a href="/export-excel"><button style="background-color: #28a745;">📊 Excel'e Aktar</button></a>
+        <a href="/ip-monitor"><button style="background-color: #6f42c1;">🌐 IP Monitor</button></a>
         {% if request.args.get('group') == '1' %}
             <a href="/?group=0{{ '&search=' + search_query if search_query }}"><button style="background-color: #28a745;">📋 Normal Görünüm</button></a>
         {% else %}

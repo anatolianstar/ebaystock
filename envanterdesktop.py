@@ -5,6 +5,7 @@ from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode import code128
 from reportlab.lib.pagesizes import letter
 import sqlite3
+import sys
 import os
 import pandas as pd
 from PIL import Image, ImageTk, ImageDraw, ExifTags
@@ -22,7 +23,17 @@ class InventoryApp:
         self.root.title("Inventory Manager")
         
         # Resim yükleme klasörünü oluştur
-        self.upload_folder = 'static/uploads'
+        # Exe için klasör yolu ayarla - Standart yaklaşım
+        if getattr(sys, 'frozen', False):
+            # Exe durumunda - exe'nin yanındaki klasör
+            app_dir = os.path.dirname(sys.executable)
+            self.upload_folder = os.path.join(app_dir, 'static', 'uploads')
+            print(f"🔧 Running as EXE - Upload folder: {self.upload_folder}")
+        else:
+            # Normal Python durumunda
+            self.upload_folder = 'static/uploads'
+            print(f"🔧 Running as Script - Upload folder: {self.upload_folder}")
+        
         os.makedirs(self.upload_folder, exist_ok=True)
         
         # Thumbnail klasörü oluştur
@@ -861,8 +872,9 @@ class InventoryApp:
                             # Dosya uzantısını al
                             file_extension = os.path.splitext(selected_image_path)[1].lower()
                             
-                            # Benzersiz dosya adı oluştur
-                            safe_filename = f"product_{new_item['Item Number']}_{str(uuid.uuid4())[:8]}{file_extension}"
+                            # Benzersiz dosya adı oluştur - Standart format
+                            timestamp = str(int(time.time()))
+                            safe_filename = f"product_{new_item['Item Number']}_{new_item_id}_{timestamp}{file_extension}"
                             destination = os.path.join(self.upload_folder, safe_filename)
                             
                             # Klasörü kontrol et, yoksa oluştur
@@ -1521,8 +1533,17 @@ class InventoryApp:
             # Dosya uzantısını al
             file_extension = os.path.splitext(file_path)[1].lower()
             
-            # Benzersiz dosya adı oluştur
-            safe_filename = f"product_{item_number}_{str(uuid.uuid4())[:8]}{file_extension}"
+            # Benzersiz dosya adı oluştur - Standart format  
+            # ID'yi veritabanından al
+            conn = sqlite3.connect("database.db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM inventory WHERE item_number = ?", (item_number,))
+            result = cursor.fetchone()
+            item_id = result[0] if result else "0"
+            conn.close()
+            
+            timestamp = str(int(time.time()))
+            safe_filename = f"product_{item_number}_{item_id}_{timestamp}{file_extension}"
             destination = os.path.join(self.upload_folder, safe_filename)
             
             # Klasörü kontrol et, yoksa oluştur
